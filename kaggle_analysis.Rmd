@@ -328,4 +328,5 @@ cat("Number of airlines:", length(unique(kaggle$airline)), "\n")
 cat("Number of source cities:", length(unique(kaggle$source_city)), "\n")
 cat("Number of destination cities:", length(unique(kaggle$destination_city)), "\n")
 cat("Average ticket price:", round(mean(kaggle$price), 2), "\n")
-cat("Price range:", round
+cat("Price range:", round(min(kaggle$price), 2), "to", round(max(kaggle$price), 2), "\n")
+```

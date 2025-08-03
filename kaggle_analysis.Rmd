@@ -1,0 +1,331 @@
+---
+title: "Flight Price Analysis"
+author: "Data Analysis"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+```
+
+## Data Loading
+
+```{r load_data}
+# Load the dataset
+kaggle<- read_csv('/Users/aaronstaehely/Documents/Sabermetrics work/Kaggler/airlines_flights_data.csv')
+
+
+# Display first few rows
+head(kaggle)
+```
+
+## Airlines in the Dataset
+
+```{r airlines_analysis}
+# What are the airlines in the dataset, accompanied by their frequencies?
+unique_airlines <- unique(kaggle$airline)
+cat("Unique Airlines:\n")
+print(unique_airlines)
+
+cat("\nFrequency of each airline:\n")
+airline_freq <- table(kaggle$airline)
+print(airline_freq)
+```
+
+### Number of Flights by Airline (Ascending Order)
+
+```{r airline_plot}
+ggplot(kaggle, aes(y=reorder(airline, airline, FUN=length), fill=airline)) +
+  geom_bar() +
+  labs(title="Number of Flights by Airline",
+       x="Number of Flights", 
+       y="Airline") +
+  scale_x_continuous(labels = scales::comma, breaks = seq(0, max(table(kaggle$airline)), by = 20000)) +
+  guides(fill="none")+
+  scale_fill_manual(values = rep(c("lightblue", "lightgreen"), length.out = length(unique(kaggle$airline)))) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Departure and Arrival Time Analysis
+
+### Bar Graphs representing the Departure Time & Arrival Time
+
+```{r time_analysis}
+# Create data for departure and arrival times with descending counts
+departure_counts <- sort(table(kaggle$departure_time), decreasing = TRUE)
+arrival_counts <- sort(table(kaggle$arrival_time), decreasing = TRUE)
+
+# Create separate data frames for plotting
+departure_data <- data.frame(
+  time = names(departure_counts),
+  count = as.numeric(departure_counts)
+)
+
+arrival_data <- data.frame(
+  time = names(arrival_counts),
+  count = as.numeric(arrival_counts)
+)
+
+# Create separate plots using grid
+p1 <- ggplot(departure_data, aes(x = reorder(time, -count), y = count)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Number of Flights by Departure Time",
+       x = "Departure Time", 
+       y = "Number of Flights") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p2 <- ggplot(arrival_data, aes(x = reorder(time, -count), y = count)) +
+  geom_bar(stat = "identity", fill = "lightgreen") +
+  labs(title = "Number of Flights by Arrival Time",
+       x = "Arrival Time", 
+       y = "Number of Flights") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display plots in a grid
+grid.arrange(p1, p2, ncol = 2)
+```
+
+## Source City and Destination City Analysis
+
+### Bar Graphs representing the Source City & Destination City
+
+```{r city_analysis}
+# Create data for source and destination cities with descending counts
+source_counts <- sort(table(kaggle$source_city), decreasing = TRUE)
+destination_counts <- sort(table(kaggle$destination_city), decreasing = TRUE)
+
+# Create separate data frames for plotting
+source_data <- data.frame(
+  place = names(source_counts),
+  count = as.numeric(source_counts)
+)
+
+destination_data <- data.frame(
+  place = names(destination_counts),
+  count = as.numeric(destination_counts)
+)
+
+p1 <- ggplot(source_data, aes(y = reorder(place, -count), x = count)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Number of Flights by Source City",
+       x = "Number of Flights", 
+       y = "Source City") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p2 <- ggplot(destination_data, aes(y = reorder(place, -count), x = count)) +
+  geom_bar(stat = "identity", fill = "lightgreen") +
+  labs(title = "Number of Flights by Destination City",
+       x = "Number of Flights", 
+       y = "Destination City") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display plots in a grid
+grid.arrange(p1, p2, ncol = 2)
+```
+
+## Price Analysis by Airline and Class
+
+### Does price vary with airlines?
+
+```{r price_airline_class}
+price_summary <- kaggle %>%
+  dplyr::group_by(airline,class) %>%
+  summarise(
+    Price = mean(price)
+  )
+
+ggplot(price_summary, aes(x = airline, y = Price, fill = class)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Price by Airline and Class",
+       x = "Airline", 
+       y = "Mean Price",
+       fill = "Class") +
+  scale_fill_manual(values = c("Economy" = "maroon", "Business" = "orange")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Price Analysis by Time
+
+### Does ticket price change based on the departure time and arrival time?
+
+```{r price_time_analysis}
+# Calculate mean price by departure time
+departure_price_summary <- kaggle %>%
+  group_by(departure_time) %>%
+  summarise(mean_price = mean(price))
+
+# Create factor with proper time order
+time_order <- c("Early_Morning", "Morning", "Afternoon", "Evening", "Night", "Late_Night")
+departure_price_summary$departure_time <- factor(departure_price_summary$departure_time, levels = time_order)
+
+# Create bar plot for departure time
+ggplot(departure_price_summary, aes(x = departure_time, y = mean_price, fill = departure_time)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Mean Price by Departure Time",
+       x = "Departure Time", 
+       y = "Mean Price") +
+  guides(fill="none")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Calculate mean price by arrival time
+arrival_price_summary <- kaggle %>%
+  group_by(arrival_time) %>%
+  summarise(mean_price = mean(price))
+
+arrival_price_summary$arrival_time <- factor(arrival_price_summary$arrival_time, levels = time_order)
+
+# Create bar plot for arrival time
+ggplot(arrival_price_summary, aes(x = arrival_time, y = mean_price, fill = arrival_time)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Mean Price by Arrival Time",
+       x = "Arrival Time", 
+       y = "Mean Price") +
+  guides(fill="none")+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Line plots with confidence intervals faceted by time
+
+```{r line_plots_time}
+# Set up time order for the dataset
+time_order2 <- c("Night","Early_Morning", "Morning", "Evening", "Afternoon", "Late_Night")
+kaggle$arrival_time <- factor(kaggle$arrival_time, levels = time_order)
+kaggle$departure_time <- factor(kaggle$departure_time, levels = time_order)
+
+# Create line plot similar to seaborn relplot
+ggplot(kaggle, aes(x = arrival_time, y = price)) +
+  stat_summary(fun = mean, geom = "line", aes(group = 1), size = 1, color = "blue") +
+  stat_summary(fun.data = mean_cl_normal, geom = "ribbon", aes(group = 1), alpha = 0.3, fill = "lightblue") +
+  facet_wrap(~departure_time, nrow = 1) +
+  labs(title = "Price by Arrival Time, Faceted by Departure Time",
+       x = "Arrival Time", 
+       y = "Price") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Price Analysis by Source and Destination Cities
+
+### How the price changes with change in Source and Destination?
+
+```{r price_source_dest}
+price_by_source_city <- kaggle %>%
+  dplyr::group_by(source_city) %>%
+  summarise(
+    Price = mean(price)
+  )
+
+price_by_dest_city <- kaggle %>%
+  dplyr::group_by(destination_city) %>%
+  summarise(
+    Price = mean(price)
+  )
+
+ggplot(kaggle, aes(x = destination_city, y = price)) +
+  stat_summary(fun = mean, geom = "line", aes(group = 1), size = 1, color = "blue") +
+  stat_summary(fun.data = mean_cl_normal, geom = "ribbon", aes(group = 1), alpha = 0.3, fill = "lightblue") +
+  facet_wrap(~source_city, nrow = 1) +
+  labs(title = "Price by Destination City, Faceted by Source City",
+       x = "Destination City", 
+       y = "Price") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Price Analysis by Days Left
+
+### How is the price affected when tickets are bought in just 1 or 2 days before departure?
+
+```{r price_days_left}
+price_by_days_left <- kaggle %>%
+  dplyr::group_by(days_left) %>%
+  summarise(
+    Price = mean(price)
+  )
+
+ggplot(kaggle, aes(x = days_left, y = price)) +
+  stat_summary(fun = mean, geom = "line", aes(group = 1), size = 1, color = "blue") +
+  stat_summary(fun.data = mean_cl_normal, geom = "ribbon", aes(group = 1), alpha = 0.5, fill = "lightblue") +
+  labs(title = "Price by Days Left",
+       x = "Days Left", 
+       y = "Price") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Class Comparison Analysis
+
+### How does the ticket price vary between Economy and Business class?
+
+```{r class_comparison}
+kaggle_business <- kaggle %>%
+  filter(
+    class != 'Economy'
+  )
+
+kaggle_economy <- kaggle %>%
+  filter(
+    class == 'Economy'
+  )
+
+economy_mean <- kaggle_economy %>%
+  summarise(
+    Price = mean(price)
+  )
+
+business_mean <- kaggle_business %>%
+  summarise(
+    Price = mean(price)
+  )
+
+cat("Average Economy Class Price:", round(economy_mean$Price, 2), "\n")
+cat("Average Business Class Price:", round(business_mean$Price, 2), "\n")
+cat("Price Difference:", round(business_mean$Price - economy_mean$Price, 2), "\n")
+```
+
+## Specific Route Analysis
+
+### What will be the Average Price of Vistara airline for a flight from Delhi to Hyderabad in Business Class?
+
+```{r specific_route}
+new_data <- kaggle %>%
+  filter(
+    airline == 'Vistara',
+    source_city == 'Delhi',
+    destination_city == 'Hyderabad',
+    class == 'Business'
+  )
+
+cat("Average Price for Vistara Business Class flight from Delhi to Hyderabad:", 
+    round(mean(new_data$price), 2), "\n")
+cat("Number of flights in this category:", nrow(new_data), "\n")
+```
+
+## Summary Statistics
+
+```{r summary_stats}
+cat("Dataset Summary:\n")
+cat("Total number of flights:", nrow(kaggle), "\n")
+cat("Number of airlines:", length(unique(kaggle$airline)), "\n")
+cat("Number of source cities:", length(unique(kaggle$source_city)), "\n")
+cat("Number of destination cities:", length(unique(kaggle$destination_city)), "\n")
+cat("Average ticket price:", round(mean(kaggle$price), 2), "\n")
+cat("Price range:", round
